@@ -316,7 +316,7 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
     // setup layout
     rc = striper->set_object_layout_stripe_count(file.nbStripes);
     if (rc != 0) {
-      logwrapper((char*)"getRadosStriper : invalid nbStripes %d", file.nbStripes);
+      logwrapper((char*)"getRadosStriper : invalid nbStripes %d\n", file.nbStripes);
       delete striper;
       delete ioctx;
       g_cluster->shutdown();
@@ -326,7 +326,7 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
     }
     rc = striper->set_object_layout_stripe_unit(file.stripeUnit);
     if (rc != 0) {
-      logwrapper((char*)"getRadosStriper : invalid stripeUnit %d (must be non0, multiple of 64K)", file.stripeUnit);
+      logwrapper((char*)"getRadosStriper : invalid stripeUnit %d (must be non0, multiple of 64K)\n", file.stripeUnit);
       delete striper;
       delete ioctx;
       g_cluster->shutdown();
@@ -336,7 +336,7 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
     }
     rc = striper->set_object_layout_object_size(file.objectSize);
     if (rc != 0) {
-      logwrapper((char*)"getRadosStriper : invalid objectSize %d (must be non 0, multiple of stripe_unit)", file.objectSize);
+      logwrapper((char*)"getRadosStriper : invalid objectSize %d (must be non 0, multiple of stripe_unit)\n", file.objectSize);
       delete striper;
       delete ioctx;
       g_cluster->shutdown();
@@ -383,7 +383,7 @@ extern "C" {
   };
 
   int ceph_posix_open(const char *pathname, int flags, mode_t mode) {
-    logwrapper((char*)"ceph_open : fd %d associated to %s", g_nextCephFd, pathname);
+    logwrapper((char*)"ceph_open : fd %d associated to %s\n", g_nextCephFd, pathname);
     CephFileRef fr = getCephFileRef(pathname, flags, mode, 0);
     g_fds[g_nextCephFd] = fr;
     g_nextCephFd++;
@@ -396,7 +396,7 @@ extern "C" {
   int ceph_posix_close(int fd) {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
-      logwrapper((char*)"ceph_close: closed fd %d", fd);
+      logwrapper((char*)"ceph_close: closed fd %d\n", fd);
       if (it->second.flags & O_WRONLY) {
         g_filesOpenForWrite.erase(g_filesOpenForWrite.find(it->second.name));
       }
@@ -425,7 +425,7 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_lseek64: for fd %d, offset=%d, whence=%d", fd, offset, whence);
+      logwrapper((char*)"ceph_lseek64: for fd %d, offset=%d, whence=%d\n", fd, offset, whence);
       return lseek_compute_offset(fr, offset, whence);
     } else {
       return -EBADF;
@@ -436,7 +436,7 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_write: for fd %d, count=%d", fd, count);
+      logwrapper((char*)"ceph_write: for fd %d, count=%d\n", fd, count);
       if ((fr.flags & O_WRONLY) == 0) {
         return -EBADF;
       }
@@ -459,7 +459,7 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_read: for fd %d, count=%d", fd, count);
+      logwrapper((char*)"ceph_read: for fd %d, count=%d\n", fd, count);
       if ((fr.flags & O_WRONLY) != 0) {
         return -EBADF;
       }
@@ -479,7 +479,7 @@ extern "C" {
   }
 
   int ceph_posix_stat64(const char *pathname, struct stat64 *buf) {
-    logwrapper((char*)"ceph_stat64 : %s", pathname);
+    logwrapper((char*)"ceph_stat64 : %s\n", pathname);
     // minimal stat : only size and times are filled
     // atime, mtime and ctime are set all to the same value
     // mode is set arbitrarily to 0666
@@ -525,7 +525,7 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_fgetxattr: fd %d name=%s", fd, name);
+      logwrapper((char*)"ceph_fgetxattr: fd %d name=%s\n", fd, name);
       return ceph_posix_internal_getxattr(fr, name, value, size);
     } else {
       return -EBADF;
@@ -553,7 +553,7 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_fsetxattr: fd %d name=%s value=%s", fd, name, value);
+      logwrapper((char*)"ceph_fsetxattr: fd %d name=%s value=%s\n", fd, name, value);
       return ceph_posix_internal_setxattr(fr, name, value, size, flags);
     } else {
       return -EBADF;
