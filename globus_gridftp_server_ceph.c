@@ -843,15 +843,24 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
         xattr_len = ceph_posix_fgetxattr(ceph_handle->fd,
                                          "user.checksum.value",
                                          ckSumbufdisk,CA_MAXCKSUMLEN);
-          if (-1 == xattr_len) {
-            /* no error messages */
-            useCksum = 0;
-          } else {
-            ckSumbufdisk[xattr_len] = '\0';
-            if (strncmp(ckSumnamedisk,"ADLER32",CA_MAXCKSUMNAMELEN) != 0) {
-              useCksum=1; /* for gridftp we know only ADLER32 */
-            }
+        if (xattr_len < 0) {
+          /* error */
+          ceph_handle->cached_res =
+            globus_error_put (globus_object_construct (GLOBUS_ERROR_TYPE_BAD_DATA));
+          if (ceph_handle->outstanding == 0) {
+            globus_gridftp_server_finished_transfer(ceph_handle->op,
+                                                    ceph_handle->cached_res);
           }
+          char errorBuf[1024];
+          sprintf(errorBuf, "error detected while reading checksum for fd: %d\n", ceph_handle->fd);
+          globus_ceph_close(func, ceph_handle, NULL, errorBuf);
+          return ceph_handle->done;
+        } else {
+          ckSumbufdisk[xattr_len] = '\0';
+          if (strncmp(ckSumnamedisk,"ADLER32",CA_MAXCKSUMNAMELEN) != 0) {
+            useCksum=1; /* for gridftp we know only ADLER32 */
+          }
+        }
       }
 
     if (useCksum) { /* we have disks and on the fly checksums here */
