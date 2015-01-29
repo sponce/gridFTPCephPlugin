@@ -513,11 +513,11 @@ extern "C" {
     }
     ceph::bufferlist bl;
     int rc = striper->getxattr(file.name, name, bl);
-    if (rc) {
-      return -rc;
+    if (rc < 0) {
+      return rc;
     }
-    bl.copy(0, size, (char*)value);
-    return 0;
+    bl.copy(0, rc, (char*)value);
+    return rc;
   }  
 
   ssize_t ceph_posix_fgetxattr(int fd, const char* name,

@@ -852,7 +852,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
                                                     ceph_handle->cached_res);
           }
           char errorBuf[1024];
-          sprintf(errorBuf, "error detected while reading checksum for fd: %d\n", ceph_handle->fd);
+          sprintf(errorBuf, "error detected while reading checksum for fd: %d, errono=%d\n", ceph_handle->fd, -xattr_len);
           globus_ceph_close(func, ceph_handle, NULL, errorBuf);
           return ceph_handle->done;
         } else {
