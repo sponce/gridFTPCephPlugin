@@ -34,8 +34,5 @@ int ceph_posix_statfs(long long *totalSpace, long long *freeSpace);
 int ceph_posix_truncate(const char *pathname, unsigned long long size);
 int ceph_posix_ftruncate(int fd, unsigned long long size);
 int ceph_posix_unlink(const char *pathname);
-DIR* ceph_posix_opendir(const char *pathname);
-int ceph_posix_readdir(DIR* dirp, char *buff, int blen);
-int ceph_posix_closedir(DIR *dirp);
 
 #endif
