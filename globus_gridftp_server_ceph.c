@@ -311,7 +311,7 @@ static void globus_l_gfs_file_net_read_cb(globus_gfs_operation_t op,
                                           void *user_arg) {
   globus_off_t                 start_offset;
   globus_l_gfs_ceph_handle_t * ceph_handle;
-  globus_size_t                bytes_written;
+  ssize_t                      bytes_written;
   unsigned long                adler;
   checksum_block_list_t**      checksum_array;
   checksum_block_list_t *      checksum_list_pp;
@@ -339,36 +339,42 @@ static void globus_l_gfs_file_net_read_cb(globus_gfs_operation_t op,
         ceph_handle->done = GLOBUS_TRUE;
       } else {
         bytes_written = ceph_posix_write(ceph_handle->fd, buffer, nbytes);
-        /* fill the checksum list  */
-        /* we will have a lot of checksums blocks in the list */
-        adler = adler32(0L, Z_NULL, 0);
-        adler = adler32(adler, buffer, nbytes);
-
-        ceph_handle->checksum_list_p->next=
-          (checksum_block_list_t *)globus_malloc(sizeof(checksum_block_list_t));
-
-        if (ceph_handle->checksum_list_p->next==NULL) {
+        if (bytes_written < 0) {
+          globus_gfs_log_message(GLOBUS_GFS_LOG_ERR,"%s: write error, return code %d \n",func, -bytes_written);
           ceph_handle->cached_res = GLOBUS_FAILURE;
-          globus_gfs_log_message(GLOBUS_GFS_LOG_ERR,"%s: malloc error \n",func);
-          ceph_handle->done = GLOBUS_TRUE;
-          globus_mutex_unlock(&ceph_handle->mutex);
-          return;
-        }
-        ceph_handle->checksum_list_p->next->next=NULL;
-        ceph_handle->checksum_list_p->offset=offset;
-        ceph_handle->checksum_list_p->size=bytes_written;
-        ceph_handle->checksum_list_p->csumvalue=adler;
-        ceph_handle->checksum_list_p=ceph_handle->checksum_list_p->next;
-        ceph_handle->number_of_blocks++;
-        /* end of the checksum section */
-        if(bytes_written < nbytes) {
-          errno = ENOSPC;
-          ceph_handle->cached_res = globus_l_gfs_make_error("write");
-          ceph_handle->done = GLOBUS_TRUE;
-          free_checksum_list(ceph_handle->checksum_list);
+          ceph_handle->done = GLOBUS_TRUE;      
         } else {
-          globus_gridftp_server_update_bytes_written(op,offset,nbytes);
-          ceph_handle->fileSize += bytes_written;
+          /* fill the checksum list  */
+          /* we will have a lot of checksums blocks in the list */
+          adler = adler32(0L, Z_NULL, 0);
+          adler = adler32(adler, buffer, nbytes);
+
+          ceph_handle->checksum_list_p->next=
+            (checksum_block_list_t *)globus_malloc(sizeof(checksum_block_list_t));
+
+          if (ceph_handle->checksum_list_p->next==NULL) {
+            ceph_handle->cached_res = GLOBUS_FAILURE;
+            globus_gfs_log_message(GLOBUS_GFS_LOG_ERR,"%s: malloc error \n",func);
+            ceph_handle->done = GLOBUS_TRUE;
+            globus_mutex_unlock(&ceph_handle->mutex);
+            return;
+          }
+          ceph_handle->checksum_list_p->next->next=NULL;
+          ceph_handle->checksum_list_p->offset=offset;
+          ceph_handle->checksum_list_p->size=bytes_written;
+          ceph_handle->checksum_list_p->csumvalue=adler;
+          ceph_handle->checksum_list_p=ceph_handle->checksum_list_p->next;
+          ceph_handle->number_of_blocks++;
+          /* end of the checksum section */
+          if(bytes_written < nbytes) {
+            errno = ENOSPC;
+            ceph_handle->cached_res = globus_l_gfs_make_error("write");
+            ceph_handle->done = GLOBUS_TRUE;
+            free_checksum_list(ceph_handle->checksum_list);
+          } else {
+            globus_gridftp_server_update_bytes_written(op,offset,nbytes);
+            ceph_handle->fileSize += bytes_written;
+          }
         }
       }
     }
