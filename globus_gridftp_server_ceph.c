@@ -5,6 +5,9 @@
  *****************************************************************************/
 #if defined(linux)
 #define _LARGE_FILES
+#define __USE_LARGEFILE64
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
 #endif
 
 #include <sys/types.h>
