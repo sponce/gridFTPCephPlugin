@@ -20,9 +20,7 @@
 
 #include "globus_gridftp_server.h"
 #include "dsi_ceph.h"
-#include "getconfent.h"
-#include "serrno.h"
-#include "ceph/ceph_posix.h"
+#include "ceph_posix.h"
 
 #define  CA_MAXCKSUMLEN 32
 #define  CA_MAXCKSUMNAMELEN 15
