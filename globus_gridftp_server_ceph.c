@@ -342,7 +342,7 @@ static void globus_l_gfs_file_net_read_cb(globus_gfs_operation_t op,
         if (bytes_written < 0) {
           globus_gfs_log_message(GLOBUS_GFS_LOG_ERR,"%s: write error, return code %d \n",func, -bytes_written);
           ceph_handle->cached_res = GLOBUS_FAILURE;
-          ceph_handle->done = GLOBUS_TRUE;      
+          ceph_handle->done = GLOBUS_TRUE;
         } else {
           /* fill the checksum list  */
           /* we will have a lot of checksums blocks in the list */

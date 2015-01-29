@@ -387,7 +387,7 @@ extern "C" {
     CephFileRef fr = getCephFileRef(pathname, flags, mode, 0);
     g_fds[g_nextCephFd] = fr;
     g_nextCephFd++;
-    if (flags & O_RDWR) {
+    if (flags & O_WRONLY) {
       g_filesOpenForWrite.insert(fr.name);
     }
     return g_nextCephFd-1;
@@ -397,7 +397,7 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       logwrapper((char*)"ceph_close: closed fd %d", fd);
-      if (it->second.flags & O_RDWR) {
+      if (it->second.flags & O_WRONLY) {
         g_filesOpenForWrite.erase(g_filesOpenForWrite.find(it->second.name));
       }
       g_fds.erase(it);
@@ -437,7 +437,7 @@ extern "C" {
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
       logwrapper((char*)"ceph_write: for fd %d, count=%d", fd, count);
-      if ((fr.flags & O_RDWR) == 0) {
+      if ((fr.flags & O_WRONLY) == 0) {
         return -EBADF;
       }
       libradosstriper::RadosStriper *striper = getRadosStriper(fr);
@@ -460,7 +460,7 @@ extern "C" {
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
       logwrapper((char*)"ceph_read: for fd %d, count=%d", fd, count);
-      if ((fr.flags & O_RDWR) != 0) {
+      if ((fr.flags & O_WRONLY) != 0) {
         return -EBADF;
       }
       libradosstriper::RadosStriper *striper = getRadosStriper(fr);
