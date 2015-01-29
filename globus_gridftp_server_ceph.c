@@ -175,7 +175,7 @@ static void globus_ceph_close(const char* func,
  *        The DSI developer should jsut follow this template for now
  ************************************************************************/
 static void globus_l_gfs_ceph_start(globus_gfs_operation_t op,
-                                       globus_gfs_session_info_t *session_info) {
+                                    globus_gfs_session_info_t *session_info) {
   globus_l_gfs_ceph_handle_t *ceph_handle;
   globus_gfs_finished_info_t finished_info;
   char *func="globus_l_gfs_ceph_start";
@@ -237,7 +237,7 @@ static void globus_l_gfs_ceph_stat(globus_gfs_operation_t op,
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP, "%s: %s\n",
                          func, stat_info->pathname);
   status = ceph_posix_stat64(stat_info->pathname, &statbuf);
-  if (status!=0) {
+  if (status != 0) {
     result=globus_l_gfs_make_error("stat64");
     globus_gridftp_server_finished_stat(op,result,NULL, 0);
     return;
@@ -1009,6 +1009,8 @@ static int globus_l_gfs_ceph_activate(void) {
                                 &globus_l_gfs_ceph_dsi_iface);
   // initialize ceph wrapper log
   ceph_posix_set_logfunc(ceph_logfunc_wrapper);
+  // setup defaults from environment
+  ceph_posix_set_defaults(getenv("GRIDFTP_CEPH_DEFAULTS"));
   return 0;
 }
 
