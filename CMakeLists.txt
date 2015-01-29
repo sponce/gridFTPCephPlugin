@@ -22,6 +22,7 @@
 #
 cmake_minimum_required (VERSION 2.6)
 
+set (CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 find_package (globus REQUIRED)
 find_package (ceph REQUIRED)
 include_directories(${RADOS_INCLUDE_DIR})
