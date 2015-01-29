@@ -418,7 +418,7 @@ extern "C" {
     default:
       return -EINVAL;
     }
-    return 0;
+    return fr.offset;
   }
 
   off64_t ceph_posix_lseek64(int fd, off64_t offset, int whence) {
