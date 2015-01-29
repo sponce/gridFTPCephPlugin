@@ -145,15 +145,13 @@ static void globus_ceph_close(const char* func,
                                 globus_l_gfs_ceph_handle_t* ceph_handle,
                                 const char* ckSumbuf,
                                 const char* error_msg) {
-  int rc = 0;
   char* errorBuf = NULL;
   ceph_handle->done = GLOBUS_TRUE;
   ceph_posix_close(ceph_handle->fd);
-  if(error_msg) {
+  if (error_msg) {
     ceph_handle->cached_res = GLOBUS_FAILURE;
     globus_gfs_log_message(GLOBUS_GFS_LOG_ERR, "%s: terminating transfer on error: %s\n", func, error_msg);
     errorBuf = strdup(error_msg);
-    rc = SEINTERNAL;
   }
   else {
     ceph_handle->cached_res = GLOBUS_SUCCESS;
@@ -252,7 +250,7 @@ static void globus_l_gfs_ceph_stat(globus_gfs_operation_t op,
     return;
   }
   stat_count=1;
-  fill_stat_array(&(stat_array[0]), statbuf, pathname);
+  fill_stat_array(&(stat_array[0]), statbuf, stat_info->pathname);
   globus_gridftp_server_finished_stat(op, GLOBUS_SUCCESS, stat_array, stat_count);
   free_stat_array(stat_array, stat_count);
   globus_free(stat_array);
