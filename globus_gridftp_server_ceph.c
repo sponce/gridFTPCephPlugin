@@ -15,7 +15,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <zlib.h>
@@ -237,9 +236,9 @@ static void globus_l_gfs_ceph_stat(globus_gfs_operation_t op,
   ceph_handle = (globus_l_gfs_ceph_handle_t *) user_arg;
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP, "%s: %s\n",
                          func, stat_info->pathname);
-  status=ceph_posix_stat64(stat_info->pathname, &statbuf);
+  status = ceph_posix_stat64(stat_info->pathname, &statbuf);
   if (status!=0) {
-    result=globus_l_gfs_make_error("fstat64");
+    result=globus_l_gfs_make_error("stat64");
     globus_gridftp_server_finished_stat(op,result,NULL, 0);
     return;
   }

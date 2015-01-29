@@ -421,17 +421,6 @@ extern "C" {
     return 0;
   }
 
-  off_t ceph_posix_lseek(int fd, off_t offset, int whence) {
-    std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
-    if (it != g_fds.end()) {
-      CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_lseek: for fd %d, offset=%d, whence=%d", fd, offset, whence);
-      return (off_t)lseek_compute_offset(fr, offset, whence);
-    } else {
-      return -EBADF;
-    }
-  }
-
   off64_t ceph_posix_lseek64(int fd, off64_t offset, int whence) {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
@@ -489,34 +478,8 @@ extern "C" {
     }
   }
 
-  int ceph_posix_fstat(int fd, struct stat *buf) {
-    std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
-    if (it != g_fds.end()) {
-      CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_stat: fd %d", fd);
-      // minimal stat : only size and times are filled
-      // atime, mtime and ctime are set all to the same value
-      // mode is set arbitrarily to 0666
-      libradosstriper::RadosStriper *striper = getRadosStriper(fr);
-      if (0 == striper) {
-        return -EINVAL;
-      }
-      memset(buf, 0, sizeof(*buf));
-      int rc = striper->stat(fr.name, (uint64_t*)&(buf->st_size), &(buf->st_atime));
-      if (rc != 0) {
-        return -rc;
-      }
-      buf->st_mtime = buf->st_atime;
-      buf->st_ctime = buf->st_atime;
-      buf->st_mode = 0666;
-      return 0;
-    } else {
-      return -EBADF;
-    }
-  }
-
-  int ceph_posix_stat(const char *pathname, struct stat *buf) {
-    logwrapper((char*)"ceph_stat : %s", pathname);
+  int ceph_posix_stat64(const char *pathname, struct stat64 *buf) {
+    logwrapper((char*)"ceph_stat64 : %s", pathname);
     // minimal stat : only size and times are filled
     // atime, mtime and ctime are set all to the same value
     // mode is set arbitrarily to 0666
@@ -542,33 +505,6 @@ extern "C" {
     return 0;
   }
 
-  int ceph_posix_fsync(int fd) {
-    std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
-    if (it != g_fds.end()) {
-      logwrapper((char*)"ceph_sync: fd %d", fd);
-      return 0;
-    } else {
-      return -EBADF;
-    }
-  }
-
-  int ceph_posix_fcntl(int fd, int cmd, ... /* arg */ ) {
-    std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
-    if (it != g_fds.end()) {
-      CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_fcntl: fd %d cmd=%d", fd, cmd);
-      // minimal implementation
-      switch (cmd) {
-      case F_GETFL:
-        return fr.mode;
-      default:
-        return -EINVAL;
-      }
-    } else {
-      return -EBADF;
-    }
-  }
-
   static ssize_t ceph_posix_internal_getxattr(const CephFile &file, const char* name,
                                               void* value, size_t size) {
     libradosstriper::RadosStriper *striper = getRadosStriper(file);
@@ -583,13 +519,6 @@ extern "C" {
     bl.copy(0, size, (char*)value);
     return 0;
   }  
-
-  ssize_t ceph_posix_getxattr(const char* path,
-                              const char* name, void* value,
-                              size_t size) {
-    logwrapper((char*)"ceph_getxattr: path %s name=%s", path, name);
-    return ceph_posix_internal_getxattr(getCephFile(path), name, value, size);
-  }
 
   ssize_t ceph_posix_fgetxattr(int fd, const char* name,
                                void* value, size_t size) {
@@ -618,13 +547,6 @@ extern "C" {
     return 0;
   }
 
-  ssize_t ceph_posix_setxattr(const char* path,
-                              const char* name, const void* value,
-                              size_t size, int flags) {
-    logwrapper((char*)"ceph_setxattr: path %s name=%s value=%s", path, name, value);
-    return ceph_posix_internal_setxattr(getCephFile(path), name, value, size, flags);
-  }
-
   int ceph_posix_fsetxattr(int fd,
                            const char* name, const void* value,
                            size_t size, int flags)  {
@@ -636,83 +558,6 @@ extern "C" {
     } else {
       return -EBADF;
     }
-  }
-
-  static int ceph_posix_internal_removexattr(const CephFile &file, const char* name) {
-    libradosstriper::RadosStriper *striper = getRadosStriper(file);
-    if (0 == striper) {
-      return -EINVAL;
-    }
-    int rc = striper->rmxattr(file.name, name);
-    if (rc) {
-      return -rc;
-    }
-    return 0;
-  }
-
-  int ceph_posix_removexattr(const char* path,
-                             const char* name) {
-    logwrapper((char*)"ceph_removexattr: path %s name=%s", path, name);
-    return ceph_posix_internal_removexattr(getCephFile(path), name);
-  }
-
-  int ceph_posix_fremovexattr(int fd, const char* name) {
-    std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
-    if (it != g_fds.end()) {
-      CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_fremovexattr: fd %d name=%s", fd, name);
-      return ceph_posix_internal_removexattr(fr, name);
-    } else {
-      return -EBADF;
-    }
-  }
-
-  int ceph_posix_statfs(long long *totalSpace, long long *freeSpace) {
-    logwrapper((char*)"ceph_posix_statfs");
-    librados::cluster_stat_t result;
-    int rc = g_cluster->cluster_stat(result);
-    if (0 == rc) {
-      *totalSpace = result.kb * 1024;
-      *freeSpace = result.kb_avail * 1024;
-    }
-    return rc;
-  }
-
-  static int ceph_posix_internal_truncate(const CephFile &file, unsigned long long size) {
-    libradosstriper::RadosStriper *striper = getRadosStriper(file);
-    if (0 == striper) {
-      return -EINVAL;
-    }
-    return striper->trunc(file.name, size);
-  }
-
-  int ceph_posix_ftruncate(int fd, unsigned long long size) {
-    std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
-    if (it != g_fds.end()) {
-      CephFileRef &fr = it->second;
-      logwrapper((char*)"ceph_posix_ftruncate: fd %d, size %d", fd, size);
-      return ceph_posix_internal_truncate(fr, size);
-    } else {
-      return -EBADF;
-    }
-  }
-
-  int ceph_posix_truncate(const char *pathname, unsigned long long size) {
-    logwrapper((char*)"ceph_posix_truncate : %s", pathname);
-    // minimal stat : only size and times are filled
-    CephFile file = getCephFile(pathname);
-    return ceph_posix_internal_truncate(file, size);
-  }
-
-  int ceph_posix_unlink(const char *pathname) {
-    logwrapper((char*)"ceph_posix_unlink : %s", pathname);
-    // minimal stat : only size and times are filled
-    CephFile file = getCephFile(pathname);
-    libradosstriper::RadosStriper *striper = getRadosStriper(file);
-    if (0 == striper) {
-      return -EINVAL;
-    }
-    return striper->remove(file.name);
   }
 
 } // extern "C"
