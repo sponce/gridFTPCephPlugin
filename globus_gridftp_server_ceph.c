@@ -141,9 +141,8 @@ static void ceph_logfunc_wrapper (char *format, va_list argp) {
 
 /* a function to wrap all is needed to close a file */
 static void globus_ceph_close(const char* func,
-                                globus_l_gfs_ceph_handle_t* ceph_handle,
-                                const char* ckSumbuf,
-                                const char* error_msg) {
+                              globus_l_gfs_ceph_handle_t* ceph_handle,
+                              const char* error_msg) {
   char* errorBuf = NULL;
   ceph_handle->done = GLOBUS_TRUE;
   ceph_posix_close(ceph_handle->fd);
@@ -391,7 +390,7 @@ static void globus_l_gfs_file_net_read_cb(globus_gfs_operation_t op,
         if (checksum_array == NULL) {
           free_checksum_list(ceph_handle->checksum_list);
           ceph_handle->fileSize = 0;
-          globus_ceph_close(func, ceph_handle, NULL, "Internal error (malloc failed)");
+          globus_ceph_close(func, ceph_handle, "Internal error (malloc failed)");
           globus_mutex_unlock(&ceph_handle->mutex);
           return;
         }
@@ -436,7 +435,7 @@ static void globus_l_gfs_file_net_read_cb(globus_gfs_operation_t op,
                                      checksum_array[i]->offset,
                                      checksum_array[i]->offset+checksum_array[i]->size,
                                      chkOffset);
-              globus_ceph_close(func, ceph_handle, NULL, "overlapping chunks detected when computing checksum");
+              globus_ceph_close(func, ceph_handle, "overlapping chunks detected when computing checksum");
               globus_mutex_unlock(&ceph_handle->mutex);
               globus_gridftp_server_finished_transfer(op, ceph_handle->cached_res);
               return;
@@ -463,7 +462,7 @@ static void globus_l_gfs_file_net_read_cb(globus_gfs_operation_t op,
           globus_gfs_log_message(GLOBUS_GFS_LOG_ERR,"%s: unable to store checksum value as xattr\n", func);
         }
       }
-      globus_ceph_close(func, ceph_handle, ckSumbuf, NULL);
+      globus_ceph_close(func, ceph_handle, NULL);
       globus_gridftp_server_finished_transfer(op, ceph_handle->cached_res);
     }
   }
@@ -485,7 +484,7 @@ static void globus_l_gfs_ceph_read_from_net
     buffer=globus_malloc(ceph_handle->block_size);
     if (buffer == NULL) {
       if (ceph_handle->outstanding == 0) {
-        globus_ceph_close(func, ceph_handle, NULL, "internal error (malloc failed)");
+        globus_ceph_close(func, ceph_handle, "internal error (malloc failed)");
         globus_gridftp_server_finished_transfer(ceph_handle->op,
                                                 ceph_handle->cached_res);
       }
@@ -504,7 +503,7 @@ static void globus_l_gfs_ceph_read_from_net
       globus_free(buffer);
       ceph_handle->cached_res = result;
       if (ceph_handle->outstanding == 0) {
-        globus_ceph_close(func, ceph_handle, NULL, "register read has finished with a bad result");
+        globus_ceph_close(func, ceph_handle, "register read has finished with a bad result");
         globus_gridftp_server_finished_transfer(ceph_handle->op,
                                                 ceph_handle->cached_res);
       }
@@ -724,7 +723,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
                                          &ceph_handle->blk_offset,
                                          &ceph_handle->blk_length);
     if(ceph_handle->blk_length == 0) {
-      globus_ceph_close(func, ceph_handle, ckSumbuf, NULL);
+      globus_ceph_close(func, ceph_handle, NULL);
       if (ceph_handle->outstanding == 0) {
         globus_gridftp_server_finished_transfer(ceph_handle->op,
                                                 ceph_handle->cached_res);
@@ -743,7 +742,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
                                     SEEK_SET);
   /* verify that it worked */
   if (start_offset != ceph_handle->blk_offset) {
-    globus_ceph_close(func, ceph_handle, NULL, "failed to seek");
+    globus_ceph_close(func, ceph_handle, "failed to seek");
     if (ceph_handle->outstanding == 0) {
       globus_gridftp_server_finished_transfer(ceph_handle->op,
                                               ceph_handle->cached_res);
@@ -753,7 +752,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
 
   buffer = globus_malloc(read_length);
   if (buffer == NULL) {
-    globus_ceph_close(func, ceph_handle, NULL, "internal error (malloc failed)");
+    globus_ceph_close(func, ceph_handle, "internal error (malloc failed)");
     if (ceph_handle->outstanding == 0) {
       globus_gridftp_server_finished_transfer(ceph_handle->op,
                                               ceph_handle->cached_res);
@@ -772,7 +771,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
 
     if (ceph_handle->checksum_list_p->next==NULL) {
       globus_free(buffer);
-      globus_ceph_close(func, ceph_handle, NULL, "internal error (malloc failed)");
+      globus_ceph_close(func, ceph_handle, "internal error (malloc failed)");
       if (ceph_handle->outstanding == 0) {
         globus_gridftp_server_finished_transfer(ceph_handle->op,
                                                 ceph_handle->cached_res);
@@ -796,7 +795,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
                                              sizeof(checksum_block_list_t*));
     if (checksum_array==NULL){
       free_checksum_list(ceph_handle->checksum_list);
-      globus_ceph_close(func, ceph_handle, NULL, "internal error (malloc failed)");
+      globus_ceph_close(func, ceph_handle, "internal error (malloc failed)");
       if (ceph_handle->outstanding == 0) {
         globus_gridftp_server_finished_transfer(ceph_handle->op,
                                                 ceph_handle->cached_res);
@@ -848,7 +847,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
           }
           char errorBuf[1024];
           sprintf(errorBuf, "error detected while reading checksum for fd: %d, errono=%d\n", ceph_handle->fd, -xattr_len);
-          globus_ceph_close(func, ceph_handle, NULL, errorBuf);
+          globus_ceph_close(func, ceph_handle, errorBuf);
           return ceph_handle->done;
         } else {
           ckSumbufdisk[xattr_len] = '\0';
@@ -869,7 +868,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
                 ckSumbufdisk,
                 ckSumbuf);
         /* to do something in error case */
-        globus_ceph_close(func, ceph_handle, NULL, errorBuf);
+        globus_ceph_close(func, ceph_handle, errorBuf);
         ceph_handle->cached_res =
           globus_error_put (globus_object_construct (GLOBUS_ERROR_TYPE_BAD_DATA));
         if (ceph_handle->outstanding == 0) {
@@ -883,7 +882,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
                              "%s: ADLER32 checksum has not been found in extended attributes\n",
                              func);
     }
-    globus_ceph_close(func, ceph_handle, ckSumbuf, NULL);
+    globus_ceph_close(func, ceph_handle, NULL);
     if (ceph_handle->outstanding == 0) {
       globus_gridftp_server_finished_transfer(ceph_handle->op,
                                               ceph_handle->cached_res);
@@ -893,7 +892,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
   }
   if (nbread < 0) { /* error */
     globus_free(buffer);
-    globus_ceph_close(func, ceph_handle, NULL, "error reading from disk");
+    globus_ceph_close(func, ceph_handle, "error reading from disk");
     if (ceph_handle->outstanding == 0) {
       globus_gridftp_server_finished_transfer(ceph_handle->op,
                                               ceph_handle->cached_res);
@@ -924,7 +923,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
 
   if(res != GLOBUS_SUCCESS) {
     globus_free(buffer);
-    globus_ceph_close(func, ceph_handle, NULL, "error writing to network");
+    globus_ceph_close(func, ceph_handle, "error writing to network");
     ceph_handle->cached_res = res;
     if (ceph_handle->outstanding == 0) {
       globus_gridftp_server_finished_transfer(ceph_handle->op,
@@ -960,7 +959,7 @@ static void globus_l_gfs_net_write_cb(globus_gfs_operation_t op,
       globus_l_gfs_ceph_send_next_to_client(ceph_handle);
     } else if (ceph_handle->outstanding == 0) {
       /* this is a read, we don't care about the checksum */
-      globus_ceph_close(func, ceph_handle, "0", NULL);
+      globus_ceph_close(func, ceph_handle, NULL);
       globus_gfs_log_message(GLOBUS_GFS_LOG_INFO,"%s: finished transfer\n",func);
       globus_gridftp_server_finished_transfer(op, ceph_handle->cached_res);
     }
