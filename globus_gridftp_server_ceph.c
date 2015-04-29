@@ -366,7 +366,7 @@ static void globus_l_gfs_file_net_read_cb(globus_gfs_operation_t op,
           ceph_handle->checksum_list_p=ceph_handle->checksum_list_p->next;
           ceph_handle->number_of_blocks++;
           /* end of the checksum section */
-          if(bytes_written < nbytes) {
+          if((globus_size_t)bytes_written < nbytes) {
             errno = ENOSPC;
             ceph_handle->cached_res = globus_l_gfs_make_error("write");
             ceph_handle->done = GLOBUS_TRUE;
@@ -835,7 +835,7 @@ static globus_bool_t globus_l_gfs_ceph_send_next_to_client
                                      "user.checksum.type",
                                      ckSumnamedisk,
                                      CA_MAXCKSUMNAMELEN);
-      if (-1 == xattr_len) {
+      if (xattr_len < 0) {
         /* no error messages */
         useCksum = 0;
       } else {
