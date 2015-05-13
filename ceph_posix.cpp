@@ -378,6 +378,25 @@ void ceph_posix_disconnect_all() {
 
 extern "C" {
 
+  int ceph_posix_truncate(const char *pathname, int flags, int mode) {
+    CephFileRef fr = getCephFileRef(pathname, flags, mode, 0);
+    libradosstriper::RadosStriper *striper = getRadosStriper(fr);
+    if (NULL == striper) {
+      logwrapper((char*) "%s : Can't get sripter\n", __FUNCTION__);
+      errno = EINVAL;
+      return -EINVAL;
+    }
+    int rc = striper->trunc(fr.name, 0);
+    if (rc != 0) {
+      logwrapper((char*) "%s : Can't truncate existing file %s\n", __FUNCTION__, fr.name.c_str());
+      errno = EACCES;
+      return rc;
+    }     
+    return 0;
+  }
+        
+
+
   void ceph_posix_set_logfunc(void (*logfunc) (char *, va_list argp)) {
     g_logfunc = logfunc;
   };
@@ -483,6 +502,7 @@ extern "C" {
     // minimal stat : only size and times are filled
     // atime, mtime and ctime are set all to the same value
     // mode is set arbitrarily to 0666
+
     libradosstriper::RadosStriper *striper = getRadosStriper(getCephFile(pathname));
     if (0 == striper) {
       return -EINVAL;
@@ -492,17 +512,23 @@ extern "C" {
     if (rc != 0) {
       // for non existing file. Check that we did not open it for write recently
       // in that case, we return 0 size and current time
-      if (-ENOENT == rc && g_filesOpenForWrite.find(pathname) != g_filesOpenForWrite.end()) {
-        buf->st_size = 0;
-        buf->st_atime = time(NULL);
-      } else {
-        return -rc;
+      if (-ENOENT == rc) {
+        if ( g_filesOpenForWrite.find(pathname) != g_filesOpenForWrite.end()) {
+          logwrapper((char*)"%s : Found file %s in g_filesOpenForWrite\n", __FUNCTION__, pathname);
+          buf->st_size = 0;
+          buf->st_atime = time(NULL);
+        } else {
+          logwrapper((char*)"%s : File %s doesn't exist and isn't in g_filesOpenForWrite\n", __FUNCTION__, pathname);
+          errno = -rc; // because striper->stat is negative for errors
+          return rc;
+        }
       }
     }
     buf->st_mtime = buf->st_atime;
     buf->st_ctime = buf->st_atime;  
     buf->st_mode = 0666;
     return 0;
+    
   }
 
   static ssize_t ceph_posix_internal_getxattr(const CephFile &file, const char* name,
