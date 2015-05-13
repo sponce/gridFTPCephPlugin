@@ -1,1 +1,1 @@
-rados --id <cephUserId> -p <cephPool> df
+#rados --id <cephUserId> -p <cephPool> df
