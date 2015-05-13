@@ -552,13 +552,33 @@ static void globus_l_gfs_ceph_recv(globus_gfs_operation_t op,
   }
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: pathname: %s \n",func,pathname);
 
-  /* try to open */
+  struct stat64 sbuf;  
+  int rc = ceph_posix_stat64(pathname, &sbuf);
+ 
+  int mode = 0666;
+ 
   flags = O_WRONLY | O_CREAT;
+  
+  if (rc == 0) { // File exists
+    globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP, "%s : File %s exists - about to truncate\n", __FUNCTION__, pathname);
+ /*      if (transfer_info->alloc_size < sbuf.st_size)  */
+      rc = ceph_posix_truncate(pathname,mode, flags, 0);
+
+    if (rc != 0) {
+        /* globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP, "%s : Cannot truncate %s\n", __FUNCTION__, pathname); // reported in ceph_posix_truncate */
+        free(pathname);
+        result = globus_l_gfs_make_error("open/truncate");
+        globus_gridftp_server_finished_transfer(op, result);
+        return;
+    }
+  }
+  /* try to open */
   if(transfer_info->truncate) flags |= O_TRUNC;
 
   ceph_handle->fd = ceph_handle_open(pathname, flags, 0644, ceph_handle);
 
   if (ceph_handle->fd < 0) {
+    errno = EACCES; 
     result=globus_l_gfs_make_error("open/create");
     free(pathname);
     globus_gridftp_server_finished_transfer(op, result);
@@ -640,6 +660,17 @@ static void globus_l_gfs_ceph_send(globus_gfs_operation_t op,
   }
 
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: pathname: %s\n",func,pathname);
+  
+  /* Check whether the file exists before going any further */
+  struct stat64 sbuf;
+  int rc = ceph_posix_stat64(pathname, &sbuf);
+  if (rc != 0) {
+     result = globus_l_gfs_make_error("open");
+     free(pathname);
+     globus_gridftp_server_finished_transfer(op, result);
+     return;    
+  }  
+  
   /* mode is ignored */
   ceph_handle->fd = ceph_handle_open(pathname, O_RDONLY,
                                            0, ceph_handle);
