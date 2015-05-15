@@ -1,0 +1,5 @@
+<globus-url-copy> file:///<localLargeFileName> <gsiFTPURLPrefix>/<objectName>
+<globus-url-copy> file:///<localSmallFileName> <gsiFTPURLPrefix>/<objectName>
+<globus-url-copy> <gsiFTPURLPrefix>/<objectName> file:///<tmpLocalFileName2>
+cmp <localSmallFileName> <tmpLocalFileName2>
+

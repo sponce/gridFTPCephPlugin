@@ -19,13 +19,13 @@
 [Generic]
 
 # Name of the gridFTP server to contact
-gridFTPServer = lxc2dev1d1
+gridFTPServer = vm119.nubes.stfc.ac.uk
 
 # Name of the ceph pool to be used
-cephPool = castor
+cephPool = rep-1
 
 # Name of the ceph user id to be used
-cephUserId = castor
+cephUserId = diamond
 
 # Put this to true if you want the test suite to skip tests when resources are missing
 # Default behavior is to fail
@@ -50,6 +50,12 @@ GLOBUSSYS = /usr
 # Local file name to be used as sample data
 localFileName = /etc/group
 
+# Local large file name - a large file for testing whether truncation is done correctly
+localLargeFileName = /etc/services
+
+# Local small file name - a small file for testing that the large file above is truncated by the GridFTP plugin
+localSmallFileName = /etc/group
+
 # Control of which test to run when no flags is given for a given set
 # If any flag is given on the command line, this part is ignored for the corresponding set
 # Entries should be in the form
@@ -63,3 +69,4 @@ localFileName = /etc/group
 # rfio_remote = false
 # rfio = true
 [TestsToRun]
+
