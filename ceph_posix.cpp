@@ -243,6 +243,7 @@ static CephFileRef getCephFileRef(const char *path, int flags,
 }
 
 static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
+  char *debug = getenv("DEBUG");
   std::stringstream ss;
   ss << file.userId << '@' << file.pool << ',' << file.nbStripes << ','
      << file.stripeUnit << ',' << file.objectSize;
@@ -256,16 +257,25 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
       // create connection to cluster
       g_cluster = new librados::Rados;
       if (0 == g_cluster) {
+        if ( !strcmp("1", debug) ) {
+          logwrapper((char*)"%s : cluster from new librados::Rados = 0\n", __FUNCTION__);
+        }
         return 0;
       }
       int rc = g_cluster->init(file.userId.c_str());
       if (rc) {
+        if ( !strcmp("1", debug) ) {
+          logwrapper((char*)"%s : cannot g_cluster->init('%s')\n", __FUNCTION__, file.userId.c_str());
+        }
         delete g_cluster;
         g_cluster = 0;
         return 0;
       }
       rc = g_cluster->conf_read_file(NULL);
       if (rc) {
+        if ( !strcmp("1", debug) ) {
+          logwrapper((char*)"%s : cannot cluster->conf_read_file(NULL)\n", __FUNCTION__);
+        }
         g_cluster->shutdown();
         delete g_cluster;
         g_cluster = 0;
@@ -274,6 +284,9 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
       g_cluster->conf_parse_env(NULL);
       rc = g_cluster->connect();
       if (rc) {
+        if ( !strcmp("1", debug) ) {
+          logwrapper((char*)"%s : cannot g_cluster->connect() - rc = %d\n", __FUNCTION__, rc);
+        }
         g_cluster->shutdown();
         delete g_cluster;
         g_cluster = 0;
@@ -283,12 +296,18 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
     // create IoCtx for our pool
     librados::IoCtx *ioctx = new librados::IoCtx;
     if (0 == ioctx) {
+      if ( !strcmp("1", debug) ) {
+        logwrapper((char*)"%s : ioCtx from new is NULL\n", __FUNCTION__);
+      }
       g_cluster->shutdown();
       delete g_cluster;
       return 0;
     }
     int rc = g_cluster->ioctx_create(file.pool.c_str(), *ioctx);
     if (rc != 0) {
+      if ( !strcmp("1", debug) ) {
+        logwrapper((char*)"%s : cannot ioctcx_create)'%s'\n", __FUNCTION__, file.pool.c_str());
+      }
       g_cluster->shutdown();
       delete g_cluster;
       g_cluster = 0;
@@ -298,6 +317,9 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
     // create RadosStriper connection
     libradosstriper::RadosStriper *striper = new libradosstriper::RadosStriper;
     if (0 == striper) {
+      if ( !strcmp("1", debug) ) {
+        logwrapper((char*)"%s : cannot create new RadosStriper\n", __FUNCTION__);
+      }
       delete ioctx;
       g_cluster->shutdown();
       delete g_cluster;
@@ -306,6 +328,9 @@ static libradosstriper::RadosStriper* getRadosStriper(const CephFile& file) {
     }
     rc = libradosstriper::RadosStriper::striper_create(*ioctx, striper);
     if (rc != 0) {
+      if ( !strcmp("1", debug) ) {
+        logwrapper((char*)"%s : cannot RadosStriper::striper_create\n", __FUNCTION__);
+      }
       delete striper;
       delete ioctx;
       g_cluster->shutdown();
@@ -444,7 +469,9 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
+#ifdef LOWLEVELTRACE      
       logwrapper((char*)"ceph_lseek64: for fd %d, offset=%d, whence=%d\n", fd, offset, whence);
+#endif
       return lseek_compute_offset(fr, offset, whence);
     } else {
       return -EBADF;
@@ -455,7 +482,9 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
+#ifdef LOWLEVELTRACE      
       logwrapper((char*)"ceph_write: for fd %d, count=%d\n", fd, count);
+#endif
       if ((fr.flags & O_WRONLY) == 0) {
         return -EBADF;
       }
@@ -478,7 +507,9 @@ extern "C" {
     std::map<unsigned int, CephFileRef>::iterator it = g_fds.find(fd);
     if (it != g_fds.end()) {
       CephFileRef &fr = it->second;
+#ifdef LOWLEVELTRACE      
       logwrapper((char*)"ceph_read: for fd %d, count=%d\n", fd, count);
+#endif      
       if ((fr.flags & O_WRONLY) != 0) {
         return -EBADF;
       }
@@ -498,14 +529,16 @@ extern "C" {
   }
 
   int ceph_posix_stat64(const char *pathname, struct stat64 *buf) {
-    logwrapper((char*)"ceph_stat64 : %s\n", pathname);
+      
+//    logwrapper((char*)"ceph_posix_stat64 : %s\n", pathname);  // This duplicates info from stat() in the calling code)
     // minimal stat : only size and times are filled
     // atime, mtime and ctime are set all to the same value
     // mode is set arbitrarily to 0666
 
     libradosstriper::RadosStriper *striper = getRadosStriper(getCephFile(pathname));
     if (0 == striper) {
-      return -EINVAL;
+      errno = EINVAL;
+      return -errno;
     }
     memset(buf, 0, sizeof(*buf));
     int rc = striper->stat(pathname, (uint64_t*)&(buf->st_size), &(buf->st_atime));
@@ -518,7 +551,7 @@ extern "C" {
           buf->st_size = 0;
           buf->st_atime = time(NULL);
         } else {
-          logwrapper((char*)"%s : File %s doesn't exist and isn't in g_filesOpenForWrite\n", __FUNCTION__, pathname);
+//          logwrapper((char*)"%s : File %s doesn't exist and isn't in g_filesOpenForWrite\n", __FUNCTION__, pathname);
           errno = -rc; // because striper->stat is negative for errors
           return rc;
         }

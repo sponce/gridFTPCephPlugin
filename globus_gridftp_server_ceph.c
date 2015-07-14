@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <zlib.h>
 #include <sys/xattr.h>
+#include <limits.h>
 
 #include "globus_gridftp_server.h"
 #include "dsi_ceph.h"
@@ -34,7 +35,19 @@ globus_version_t local_version = {
   1157544130,
   0 /* branch ID */
 };
+/*
+ * Utility function to get an integer value from the environment
+ */
+static int getconfigint(char *key) {
+    
+  char *intStr = getenv(key);
+  if (NULL == intStr) {
+     globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: Invalid integer value '%s'\n",
+          "getconfigint", key); 
+  }
+  return NULL == intStr ? 0 : atoi(intStr);
 
+}
 /*
  *  utility function to make errors
  */
@@ -230,13 +243,16 @@ static void globus_l_gfs_ceph_stat(globus_gfs_operation_t op,
   struct stat64                    statbuf;
   int                              status=0;
   globus_result_t                  result;
-
+  
   GlobusGFSName(globus_l_gfs_ceph_stat);
   ceph_handle = (globus_l_gfs_ceph_handle_t *) user_arg;
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP, "%s: %s\n",
                          func, stat_info->pathname);
   status = ceph_posix_stat64(stat_info->pathname, &statbuf);
   if (status != 0) {
+    if (status == -EINVAL) {
+      globus_gfs_log_message(GLOBUS_GFS_LOG_ERR, "%s: cannot get striper\n", __FUNCTION__);
+    }
     result=globus_l_gfs_make_error("stat64");
     globus_gridftp_server_finished_stat(op,result,NULL, 0);
     return;
@@ -278,11 +294,35 @@ static void globus_l_gfs_ceph_command(globus_gfs_operation_t op,
                                       globus_gfs_command_info_t *cmd_info,
                                       void *user_arg) {
   globus_result_t result;
-  (void)cmd_info;
+  int cmd = cmd_info->command;
   (void)user_arg;
   GlobusGFSName(globus_l_gfs_ceph_command);
-  /* in gridftp disk server we do not allow to perform commads */
-  result=GlobusGFSErrorGeneric("error: commands denied");
+  
+  switch (cmd) {
+    /* Support DELE for GridPP FTS when the target already exists*/
+    case GLOBUS_GFS_CMD_DELE:
+      globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP, "COMMAND is DELE\n");
+      errno = ENOENT;
+      result = GLOBUS_SUCCESS; // globus_l_gfs_make_error("File does not exist"); // ijj Lies
+      globus_gridftp_server_finished_command(op, result, GLOBUS_NULL);
+      return;
+      
+    /*
+     * Support MKD because GridPP FTS thinks it needs to make a *directory* '/' for a non-existent target
+     * Target name sent as a Globus URL always contains a slash which tricks client into thinking it is
+     * dealing with a hierarchical pathname, not a Ceph object name
+     */
+    case GLOBUS_GFS_CMD_MKD:
+      globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP, "COMMAND is MKD\n");
+      result = GLOBUS_SUCCESS; 
+      globus_gridftp_server_finished_command(op, result, GLOBUS_NULL);
+      return;    
+      
+    default:
+      break;
+  }
+  /* Complain if command is neither MKD nor DELE */
+  result=GlobusGFSErrorGeneric("error: commands other than MKD or DELE are denied");
   globus_gridftp_server_finished_command(op, result, GLOBUS_NULL);
   return;
 }
@@ -512,7 +552,7 @@ static void globus_l_gfs_ceph_read_from_net
     ceph_handle->outstanding++;
   }
 }
-
+    
 /*************************************************************************
  *  recv
  *  ----
@@ -594,6 +634,14 @@ static void globus_l_gfs_ceph_recv(globus_gfs_operation_t op,
   ceph_handle->op = op;
 
   globus_gridftp_server_get_block_size(op, &ceph_handle->block_size);
+  
+  int blksize = getconfigint("GRIDFTP_CEPH_WRITE_SIZE");
+  if (blksize > 0) {
+     ceph_handle->block_size = blksize; 
+  } else {
+     globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: Invalid %s block_size: %ld\n",
+          func, "GRIDFTP_CEPH_WRITE_SIZE", blksize);
+  } 
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: block size: %ld\n",
                          func,ceph_handle->block_size);
 
@@ -647,7 +695,7 @@ static void globus_l_gfs_ceph_send(globus_gfs_operation_t op,
   int                 i;
   globus_bool_t                       done;
   globus_result_t                     result;
-
+  
   GlobusGFSName(globus_l_gfs_ceph_send);
   ceph_handle = (globus_l_gfs_ceph_handle_t *) user_arg;
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: started\n",func);
@@ -695,6 +743,14 @@ static void globus_l_gfs_ceph_send(globus_gfs_operation_t op,
                          func,ceph_handle->optimal_count);
 
   globus_gridftp_server_get_block_size(op, &ceph_handle->block_size);
+ 
+  int blksize = getconfigint("GRIDFTP_CEPH_READ_SIZE");
+  if (blksize > 0) {
+     ceph_handle->block_size = blksize; 
+  } else {
+     globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: Invalid %s block_size: %ld\n",
+          func, "GRIDFTP_CEPH_READ_SIZE", blksize);
+  } 
   globus_gfs_log_message(GLOBUS_GFS_LOG_DUMP,"%s: block_size: %ld\n",
                          func,ceph_handle->block_size);
 
