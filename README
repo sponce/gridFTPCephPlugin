@@ -9,3 +9,4 @@ Current known issues :
   - in principle, paths can also be prepended with a similar string and a ':' to modify this default file by file. But this is currently broken (see next point for why)
   - paths that do not start with '/' get a slash appended in the server as they are considered relative.
 
+To get better (acceptable) read/write performance, set the parmeters GRIDFTP_CEPH_READ_SIZE and GRIDFTP_CEPH_WRITE_SIZE in the gridftp.conf file.
